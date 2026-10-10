@@ -196,7 +196,7 @@ public:
 		modern_controls_flags.reset();
 	}
 
-		void update(const pcsx2& ps2, const controller_state& c, playback& camera_playback, float time_delta) override
+	void update(const pcsx2& ps2, const controller_state& c, playback& camera_playback, float time_delta) override
 	{
 		if (sentinel.has_reset())
 		{
@@ -320,7 +320,7 @@ public:
 			}
 		}
 
-		// Логика вывода камеры на экран
+		// Логика обработки и вывода координат камеры
 		if (camera_flag.is_on())
 		{
 			float final_yaw = 0.0f;
