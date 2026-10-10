@@ -15,6 +15,14 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Compile Custom App
-      run: |
-        g++ -O3 src/main.cpp src/games/sh_origins.cpp -o ps2_cam_acolyte_custom.exe -static -lws2_32
+    - name: Configure CMake
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build Project
+      run: cmake --build build --config Release
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ps2_cam_acolyte_custom
+        path: build/Release/
