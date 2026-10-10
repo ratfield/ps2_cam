@@ -62,7 +62,7 @@ public:
 		camera_matrix_2.reset();
 	}
 
-	void update(const pcsx2& ps2, const controller_state& c, playback& camera_playback, float time_delta) override
+		void update(const pcsx2& ps2, const controller_state& c, playback& camera_playback, float time_delta) override
 	{
 		if (sentinel.has_reset())
 		{
@@ -113,10 +113,8 @@ public:
 			}
 
 			// =========================================================================
-			// НАДЁЖНАЯ СИСТЕМА ИНЪЕКЦИИ ВВОДА ЧЕРЕЗ СИСТЕМНЫЕ КЛИЕНТЫ ПЛАТФОРМЫ ПЛАТИНЫ
+			// НАТИВНЫЙ ПЕРЕХВАТ ВВОДА ДЛЯ КЛАВИАТУРЫ И МЫШИ
 			// =========================================================================
-			
-						// 1. Ходьба (W, A, S, D -> Левый стик)
 			float move_x = 0.0f;
 			float move_y = 0.0f;
 			if (GetAsyncKeyState('W') & 0x8000) move_y += 1.0f;
@@ -128,22 +126,22 @@ public:
 
 			if (move_x != 0.0f || move_y != 0.0f) {
 				glm::vec2 norm_move = glm::normalize(glm::vec2(move_x, move_y));
-				// Передаем как единый вектор (структуру), как требует автор
-				emu_pad.set_left_axis({norm_move.x, norm_move.y});
+				emu_pad.set_left_axis(norm_move); // Исправлено: передаем как vec2 object
 			} else {
-				emu_pad.set_left_axis({0.0f, 0.0f});
+				emu_pad.set_left_axis(glm::vec2(0.0f, 0.0f));
 			}
 
-			// 2. Кнопки (Привязка к точным внутренним именам автора)
-			emu_pad.set_button_state(controller_bindings::r1, (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0); // ПКМ
-			emu_pad.set_button_state(controller_bindings::cross, ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || ((GetAsyncKeyState('E') & 0x8000) != 0)); // ЛКМ / E
-			emu_pad.set_button_state(controller_bindings::square, (GetAsyncKeyState(VK_MENU) & 0x8000) != 0); // Л.ALT
-			emu_pad.set_button_state(controller_bindings::triangle, (GetAsyncKeyState(VK_TAB) & 0x8000) != 0); // TAB
-			emu_pad.set_button_state(controller_bindings::select, (GetAsyncKeyState('C') & 0x8000) != 0); // C -> Select
-			emu_pad.set_button_state(controller_bindings::start_button, (GetAsyncKeyState('P') & 0x8000) != 0); // P -> Start
-			emu_pad.set_button_state(controller_bindings::circle, (GetAsyncKeyState('F') & 0x8000) != 0); // F -> Circle
+			// Картируем кнопки под внутренние переменные структуры автора
+			emu_pad.set_button_state(controller_bindings::r1, (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0); // ПКМ -> Стойка
+			emu_pad.set_button_state(controller_bindings::cross, ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || ((GetAsyncKeyState('E') & 0x8000) != 0)); // ЛКМ / E -> Удар / Обыск
+			emu_pad.set_button_state(controller_bindings::square, (GetAsyncKeyState(VK_MENU) & 0x8000) != 0); // Л.ALT -> Бег
+			emu_pad.set_button_state(controller_bindings::triangle, (GetAsyncKeyState(VK_TAB) & 0x8000) != 0); // TAB -> Карта
+			emu_pad.set_button_state(controller_bindings::select, (GetAsyncKeyState('C') & 0x8000) != 0); // C -> Инвентарь (Select)
+			emu_pad.set_button_state(controller_bindings::start_button, (GetAsyncKeyState('P') & 0x8000) != 0); // P -> Пауза (Start)
+			emu_pad.set_button_state(controller_bindings::circle, (GetAsyncKeyState('F') & 0x8000) != 0); // F -> Фонарь (Circle)
 		}
 
+		// Логика TPS-камеры (Считывание мыши)
 		if (camera_flag.is_on())
 		{
 			float final_yaw = 0.0f;
@@ -160,7 +158,7 @@ public:
 				SDL_GetRelativeMouseState(&mouse_dx, &mouse_dy);
 
 				current_yaw += (float)mouse_dx * turn_scale * 0.1f;
-				current_pitch += (float)mouse_dy * turn_scale * 0.1f; 
+				current_pitch += (float)mouse_dy * turn_scale * 0.1f; // АВИА-ИНВЕРСИЯ
 
 				current_pitch = glm::clamp(current_pitch, glm::radians(-70.0f), glm::radians(30.0f));
 
@@ -186,7 +184,7 @@ public:
 			camera_playback.update(time_delta, final_yaw, final_pitch, pos.x, pos.y, pos.z);
 
 			glm::mat4 position_mat(1.0f);
-			position_mat[3] = glm::vec4(pos.x, pos.y, pos.z, 1.0f);
+			position_mat[3] = glm::vec4(pos.x, pos.y, pos.z, 1.0f); // Исправлено: синтаксис матрицы восстановлен
 
 			glm::mat4 final_mat = position_mat * shared_camera::compute_rotation_matrix_y_x(final_yaw, final_pitch);
 
