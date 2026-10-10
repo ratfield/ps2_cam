@@ -196,26 +196,33 @@ public:
 		modern_controls_flags.reset();
 	}
 
-		void update(const pcsx2& ps2, const controller_state& c, playback& camera_playback, float time_delta) override
+	void update(const pcsx2& ps2, const controller_state& c, playback& camera_playback, float time_delta) override
 	{
 		if (sentinel.has_reset())
 		{
 			reset_all();
 		}
 
-		// НАШ НОВЫЙ ХОТКЕЙ: Переключение TPS-мода на лету
-		if (c.button_down(controller_bindings::freecam))
+				// НАШ ОБНОВЛЕННЫЙ ХОТКЕЙ: Переключение TPS-мода по кнопке F3 на клавиатуре
+		static bool f3_pressed = false;
+		if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_F3])
 		{
-			modern_controls = !modern_controls; // Меняем состояние (вкл/выкл)
-			ps2.get_prefs().write_bool("A8D83239_modern_controls", modern_controls);
-			reset_all();
-			sentinel.increment();
+			if (!f3_pressed)
+			{
+				modern_controls = !modern_controls; // Меняем состояние (вкл/выкл)
+				ps2.get_prefs().write_bool("A8D83239_modern_controls", modern_controls);
+				reset_all();
+				sentinel.increment();
+				f3_pressed = true;
+			}
+		}
+		else
+		{
+			f3_pressed = false;
 		}
 
 		if (modern_controls)
 		{
-            // ... здесь идет весь остальной оригинальный код автора для modern_controls ...
-
 			bool changed = false;
 
 			in_gameplay.update();
@@ -316,27 +323,9 @@ public:
 				modern_controls_flags.flush(ps2);
 			}
 		}
-		else
-		{
-			if (c.button_down(controller_bindings::freecam))
-			{
-				if (!camera_flag.is_on())
-				{
-					camera_flag.set_on(true);
-					camera_matrix_1.start_tweaking();
-					camera_matrix_2.start_tweaking();
-					current_yaw = -glm::acos(camera_matrix_1.get(0));
-					current_pitch = glm::acos(camera_matrix_1.get(5));
-				}
 				else
-				{
-					camera_flag.set_on(false);
-					camera_matrix_1.stop_tweaking(true);
-					camera_matrix_2.stop_tweaking(true);
-				}
-
-				sentinel.increment();
-			}
+		{
+			// Старый фрикам полностью вырезан
 		}
 
 		if (camera_flag.is_on())
@@ -376,14 +365,9 @@ public:
 				final_yaw = glm::radians(90.0f) - atan2(cam_forward.z, cam_forward.x);
 				final_pitch = -asin(cam_forward.y);
 			}
-			else
+				else
 			{
-				current_yaw += -c.get_right_axis().first * turn_scale;
-				current_pitch += c.get_right_axis().second * turn_scale;
-
-				glm::vec3 pos_delta = shared_camera::compute_freecam_pos_delta(c, glm::vec2(-move_scale, -move_scale), current_yaw, -current_pitch);
-				pos = glm::vec3(camera_matrix_1.get(12), camera_matrix_1.get(13), camera_matrix_1.get(14)) + pos_delta;
-
+				// Чистый возврат к оригинальной фиксированной камере игры без багов
 				final_yaw = current_yaw;
 				final_pitch = current_pitch;
 			}
