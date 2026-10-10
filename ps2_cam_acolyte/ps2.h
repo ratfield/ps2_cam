@@ -2,6 +2,7 @@
 
 #include <thread>
 #include <format>
+#include <chrono>
 #include "controller_bindings.h"
 #include "playback.h"
 #include "ps2_game.h"
