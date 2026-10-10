@@ -1,4 +1,4 @@
-﻿#include "imgui.h"
+#include "imgui.h"
 #include "../ps2.h"
 #include "../ps2_commands.h"
 #include "shared_camera.h"
@@ -194,36 +194,26 @@ public:
 		modern_controls_flags.reset();
 	}
 
-	void update(const pcsx2& ps2, const controller_state& c, playback& camera_playback, float time_delta) override
+		void update(const pcsx2& ps2, const controller_state& c, playback& camera_playback, float time_delta) override
 	{
 		if (sentinel.has_reset())
 		{
 			reset_all();
 		}
 
-		if (c.button_down(controller_bindings::lighting))
+		// НАШ НОВЫЙ ХОТКЕЙ: Переключение TPS-мода на лету
+		if (c.button_down(controller_bindings::freecam))
 		{
-			brightness_flag.toggle();
-			sentinel.increment();
-		}
-
-		if (c.button_down(controller_bindings::pause))
-		{
-			if (!pause_toggle.currently_tweaking())
-			{
-				pause_toggle.start_tweaking();
-			}
-			else
-			{
-				pause_toggle.set(0, 0x00);
-				pause_toggle.flush(ps2);
-				pause_toggle.stop_tweaking();
-			}
+			modern_controls = !modern_controls; // Меняем состояние (вкл/выкл)
+			ps2.get_prefs().write_bool("A8D83239_modern_controls", modern_controls);
+			reset_all();
 			sentinel.increment();
 		}
 
 		if (modern_controls)
 		{
+            // ... здесь идет весь остальной оригинальный код автора для modern_controls ...
+
 			bool changed = false;
 
 			in_gameplay.update();
@@ -347,13 +337,6 @@ public:
 			}
 		}
 
-		// end of cinematics, etc. can reset this flag, so we keep writing it
-		if (pause_toggle.currently_tweaking())
-		{
-			pause_toggle.set(0, 0x01);
-			pause_toggle.flush(ps2);
-		}
-
 		if (camera_flag.is_on())
 		{
 			float final_yaw = 0.0f;
@@ -372,7 +355,7 @@ public:
 				const controller_state& game_controller_state = ps2.get_game_controller().get_state();
 
 				current_yaw += +game_controller_state.get_right_axis().first * turn_scale;
-				current_pitch += -game_controller_state.get_right_axis().second * turn_scale;
+				current_pitch += +game_controller_state.get_right_axis().second * turn_scale;
 
 				current_pitch = glm::clamp(current_pitch, glm::radians(-70.0f), glm::radians(30.0f));
 
