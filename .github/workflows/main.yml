@@ -22,7 +22,7 @@ jobs:
       run: |
         $sln = (Get-ChildItem -Recurse -Filter "*.sln" | Select-Object -First 1).FullName
         if (-not $sln) { throw "Файл .sln не найден ни в одной папке!" }
-        msbuild $sln /p:Configuration=Release /p:Platform=x64
+        msbuild $sln /p:Configuration=Release /p:Platform=x64 /p:DebugType=None
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
