@@ -8,6 +8,8 @@
 #include "glm/geometric.hpp"
 #include "glm/matrix.hpp"
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 class silent_hill_origins : public ps2_game
 {
