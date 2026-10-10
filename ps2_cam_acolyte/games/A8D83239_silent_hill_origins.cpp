@@ -196,14 +196,14 @@ public:
 		modern_controls_flags.reset();
 	}
 
-	void update(const pcsx2& ps2, const controller_state& c, playback& camera_playback, float time_delta) override
+		void update(const pcsx2& ps2, const controller_state& c, playback& camera_playback, float time_delta) override
 	{
 		if (sentinel.has_reset())
 		{
 			reset_all();
 		}
 
-				// НАШ ОБНОВЛЕННЫЙ ХОТКЕЙ: Переключение TPS-мода по кнопке F3 на клавиатуре
+		// НАШ ОБНОВЛЕННЫЙ ХОТКЕЙ: Переключение TPS-мода по кнопке F3 на клавиатуре
 		static bool f3_pressed = false;
 		if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_F3])
 		{
@@ -286,7 +286,6 @@ public:
 				modern_controls_flags.set(modern_controls_flags_block_offset, wantsToRun ? 1 : 0);
 				modern_controls_flags.set(modern_controls_flags_run_offset, wantsToRun ? 1 : 0);
 
-				// they're entering combat stance, so use traditional controls
 				if (game_controller_state.button(controller_bindings::r1))
 				{
 					time_until_stop_attack_allowed = 0.0f;
@@ -296,9 +295,6 @@ public:
 				}
 				else
 				{
-					// the combat system requires you to briefly hold combat stance before attacking
-					// it also requires you to hold the attack button for a bit before you will actually attack(and not cancel)
-					// in order to allow tapping or holding R2 to attack, we keep the flags set for a bit after the button change occurs
 					if (wantsToAttack)
 					{
 						modern_controls_flags.set(modern_controls_flags_stance_offset, 1);
@@ -323,18 +319,14 @@ public:
 				modern_controls_flags.flush(ps2);
 			}
 		}
-				else
-		{
-			// Старый фрикам полностью вырезан
-		}
 
+		// Логика вывода камеры на экран
 		if (camera_flag.is_on())
 		{
 			float final_yaw = 0.0f;
 			float final_pitch = 0.0f;
 
 			float turn_scale = time_delta * 3.0f;
-			float move_scale = time_delta * 10.0f;
 
 			glm::vec3 pos;
 
@@ -346,7 +338,7 @@ public:
 				const controller_state& game_controller_state = ps2.get_game_controller().get_state();
 
 				current_yaw += +game_controller_state.get_right_axis().first * turn_scale;
-				current_pitch += +game_controller_state.get_right_axis().second * turn_scale;
+				current_pitch += +game_controller_state.get_right_axis().second * turn_scale; // НАШ ПЛЮС ДЛЯ ИНВЕРСИИ
 
 				current_pitch = glm::clamp(current_pitch, glm::radians(-70.0f), glm::radians(30.0f));
 
@@ -365,11 +357,12 @@ public:
 				final_yaw = glm::radians(90.0f) - atan2(cam_forward.z, cam_forward.x);
 				final_pitch = -asin(cam_forward.y);
 			}
-				else
+			else
 			{
 				// Чистый возврат к оригинальной фиксированной камере игры без багов
 				final_yaw = current_yaw;
 				final_pitch = current_pitch;
+				pos = glm::vec3(camera_matrix_1.get(12), camera_matrix_1.get(13), camera_matrix_1.get(14));
 			}
 
 			camera_playback.update(time_delta, final_yaw, final_pitch, pos.x, pos.y, pos.z);
