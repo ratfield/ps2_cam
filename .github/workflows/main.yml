@@ -15,11 +15,6 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Install MinGW
-      uses: egor-tisin/setup-mingw-gh-action@v1
-      with:
-        version: 12.2.0
-
     - name: Compile Custom App
       run: |
         g++ -O3 src/main.cpp src/games/sh_origins.cpp -o ps2_cam_acolyte_custom.exe -static -lws2_32
