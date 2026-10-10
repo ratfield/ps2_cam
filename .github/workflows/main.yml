@@ -15,15 +15,6 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v2
-
-    - name: Build App
+    - name: Compile Custom App
       run: |
-        msbuild ps2_cam_acolyte.sln /p:Configuration=Release /p:Platform=x64
-
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ps2_cam_acolyte_custom
-        path: x64/Release/
+        g++ -O3 src/main.cpp src/games/sh_origins.cpp -o ps2_cam_acolyte_custom.exe -static -lws2_32
