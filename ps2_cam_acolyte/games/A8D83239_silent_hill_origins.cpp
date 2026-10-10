@@ -201,25 +201,22 @@ public:
 			reset_all();
 		}
 
-		if (c.button_down(controller_bindings::lighting))
+				// НАШ ОБНОВЛЕННЫЙ ХОТКЕЙ: Переключение TPS-мода по кнопке F3 на клавиатуре
+		static bool f3_pressed = false;
+		if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_F3])
 		{
-			brightness_flag.toggle();
-			sentinel.increment();
+			if (!f3_pressed)
+			{
+				modern_controls = !modern_controls; // Меняем состояние (вкл/выкл)
+				ps2.get_prefs().write_bool("A8D83239_modern_controls", modern_controls);
+				reset_all();
+				sentinel.increment();
+				f3_pressed = true;
+			}
 		}
-
-		if (c.button_down(controller_bindings::pause))
+		else
 		{
-			if (!pause_toggle.currently_tweaking())
-			{
-				pause_toggle.start_tweaking();
-			}
-			else
-			{
-				pause_toggle.set(0, 0x00);
-				pause_toggle.flush(ps2);
-				pause_toggle.stop_tweaking();
-			}
-			sentinel.increment();
+			f3_pressed = false;
 		}
 
 		if (modern_controls)
