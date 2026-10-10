@@ -10,7 +10,7 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
-#include <Windows.h> // Для GetAsyncKeyState
+#include <Windows.h>
 
 class silent_hill_origins : public ps2_game
 {
@@ -22,11 +22,6 @@ private:
 	read_only_value_set<char, 1> in_gameplay;
 	read_only_value_set<float, 3> player_pos;
 	read_only_value_set<float, 3> player_forward;
-	
-	// Адрес структуры ввода геймпада в памяти Silent Hill Origins (USA)
-	// Мы пишем маску кнопок напрямую в эмулируемую память PS2
-	tweakable_value_set<uint32_t, 1> ps2_buttons;
-	tweakable_value_set<uint8_t, 4> ps2_axes;
 
 	float current_yaw = 0.0f;
 	float current_pitch = 0.0f;
@@ -46,9 +41,6 @@ public:
 		, in_gameplay(ps2, 0x003386b8)
 		, player_pos(ps2, 0x3449c8)
 		, player_forward(ps2, 0x3449d4)
-		// Мапим адреса ввода кнопок и осей геймпада 1 в памяти игры
-		, ps2_buttons(ps2, 0x00338510) 
-		, ps2_axes(ps2, 0x00338514)
 	{
 		camera_flag.edit_off().write<int32_t>(0x001133DC, 0x0C0899E8).finalize();
 		camera_flag.edit_on().write<int32_t>(0x001133DC, 0x00000000).finalize();
@@ -68,8 +60,6 @@ public:
 		camera_flag.reset();
 		camera_matrix_1.reset();
 		camera_matrix_2.reset();
-		ps2_buttons.reset();
-		ps2_axes.reset();
 	}
 
 	void update(const pcsx2& ps2, const controller_state& c, playback& camera_playback, float time_delta) override
@@ -79,7 +69,6 @@ public:
 			reset_all();
 		}
 
-		// Хоткей F3: Включение/выключение мода на лету
 		static bool f3_pressed = false;
 		if (GetAsyncKeyState(VK_F3) & 0x8000)
 		{
@@ -124,13 +113,10 @@ public:
 			}
 
 			// =========================================================================
-			// ПРЯМАЯ ЭМУЛЯЦИЯ КЛАВИАТУРЫ И МЫШИ ЧЕРЕЗ ЗАПИСЬ В ОЗУ ЭМУЛЯТОРА
+			// НАДЁЖНАЯ СИСТЕМА ИНЪЕКЦИИ ВВОДА ЧЕРЕЗ СИСТЕМНЫЕ КЛИЕНТЫ ПЛАТФОРМЫ ПЛАТИНЫ
 			// =========================================================================
 			
-			// 1. Ходьба (W, A, S, D -> Перевод в значения осей PS2: 0..128..255)
-			uint8_t lx = 128; // Нейтральное положение стика
-			uint8_t ly = 128;
-			
+			// Считываем WASD клавиатуры на ПК
 			float move_x = 0.0f;
 			float move_y = 0.0f;
 			if (GetAsyncKeyState('W') & 0x8000) move_y += 1.0f;
@@ -138,44 +124,32 @@ public:
 			if (GetAsyncKeyState('D') & 0x8000) move_x += 1.0f;
 			if (GetAsyncKeyState('A') & 0x8000) move_x -= 1.0f;
 
+			// Модифицируем входные данные самого системного контроллера плагина,
+			// чтобы утилита на базовом уровне скормила эмулятору нужные оси
+			controller_state& emu_pad = const_cast<controller_state&>(c);
+
 			if (move_x != 0.0f || move_y != 0.0f) {
-				glm::vec2 norm_move = glm::normalize(glm::vec2(move_x, move_y)) * 127.0f;
-				lx = (uint8_t)(128 + (int)norm_move.x);
-				ly = (uint8_t)(128 - (int)norm_move.y); // Инверсия оси Y для PS2
+				glm::vec2 norm_move = glm::normalize(glm::vec2(move_x, move_y));
+				emu_pad.set_left_axis(norm_move.x, norm_move.y);
+			} else {
+				emu_pad.set_left_axis(0.0f, 0.0f);
 			}
 
-			// Пишем оси напрямую в память контроллера PS2
-			ps2_axes.start_tweaking();
-			ps2_axes.set(0, lx); // Left Stick X
-			ps2_axes.set(1, ly); // Left Stick Y
-			ps2_axes.flush(ps2);
-
-			// 2. Обработка кнопок (Битовая маска DualShock 2)
-			// В PS2 биты инвертированы (0 - нажато, 1 - отпущено). Начальное состояние 0xFFFF
-			uint32_t buttons_mask = 0xFFFF; 
-
-			if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) buttons_mask &= ~(1 << 11); // ПКМ -> R1 (Прицеливание)
-			if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) || (GetAsyncKeyState('E') & 0x8000)) {
-				buttons_mask &= ~(1 << 14); // ЛКМ / E -> Cross (Удар / Обыск)
-			}
-			if (GetAsyncKeyState(VK_MENU) & 0x8000)     buttons_mask &= ~(1 << 15); // Левый ALT -> Square (Бег)
-			if (GetAsyncKeyState(VK_TAB) & 0x8000)      buttons_mask &= ~(1 << 12); // TAB -> Triangle (Карта)
-			if (GetAsyncKeyState('C') & 0x8000)         buttons_mask &= ~(1 << 3);  // C -> Start (Инвентарь)
-			if (GetAsyncKeyState('P') & 0x8000)         buttons_mask &= ~(1 << 3);  // P -> Start (Пауза)
-			if (GetAsyncKeyState('F') & 0x8000)         buttons_mask &= ~(1 << 0);  // F -> Select (Фонарь)
-
-			ps2_buttons.start_tweaking();
-			ps2_buttons.set(0, buttons_mask);
-			ps2_buttons.flush(ps2);
+			// Картируем состояние кнопок мыши и клавиш под системные триггеры автора
+			emu_pad.set_button_state(controller_bindings::r1, (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0); // ПКМ
+			emu_pad.set_button_state(controller_bindings::cross, ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || ((GetAsyncKeyState('E') & 0x8000) != 0)); // ЛКМ / E
+			emu_pad.set_button_state(controller_bindings::square, (GetAsyncKeyState(VK_MENU) & 0x8000) != 0); // Л.ALT
+			emu_pad.set_button_state(controller_bindings::triangle, (GetAsyncKeyState(VK_TAB) & 0x8000) != 0); // TAB
+			emu_pad.set_button_state(controller_bindings::back, (GetAsyncKeyState('C') & 0x8000) != 0); // C
+			emu_pad.set_button_state(controller_bindings::start, (GetAsyncKeyState('P') & 0x8000) != 0); // P
+			emu_pad.set_button_state(controller_bindings::circle, (GetAsyncKeyState('F') & 0x8000) != 0); // F
 		}
 
-		// Логика обработки и вывода координат TPS-камеры (Считывание смещения мыши)
 		if (camera_flag.is_on())
 		{
 			float final_yaw = 0.0f;
 			float final_pitch = 0.0f;
 			float turn_scale = time_delta * 3.0f;
-
 			glm::vec3 pos;
 
 			if (modern_controls)
@@ -183,13 +157,11 @@ public:
 				player_pos.update();
 				player_forward.update();
 
-				// Считываем смещение мыши через встроенный SDL утилиты
 				int mouse_dx = 0, mouse_dy = 0;
 				SDL_GetRelativeMouseState(&mouse_dx, &mouse_dy);
 
-				// Применяем дельту мыши к углам обзора с учетом turn_scale
 				current_yaw += (float)mouse_dx * turn_scale * 0.1f;
-				current_pitch += (float)mouse_dy * turn_scale * 0.1f; // НАШ САМОЛЕТНЫЙ ПЛЮС ТУТ
+				current_pitch += (float)mouse_dy * turn_scale * 0.1f; 
 
 				current_pitch = glm::clamp(current_pitch, glm::radians(-70.0f), glm::radians(30.0f));
 
