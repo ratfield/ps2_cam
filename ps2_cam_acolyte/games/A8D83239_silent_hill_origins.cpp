@@ -321,34 +321,9 @@ public:
 				modern_controls_flags.flush(ps2);
 			}
 		}
-		else
-		{
-			if (c.button_down(controller_bindings::freecam))
-			{
-				if (!camera_flag.is_on())
-				{
-					camera_flag.set_on(true);
-					camera_matrix_1.start_tweaking();
-					camera_matrix_2.start_tweaking();
-					current_yaw = -glm::acos(camera_matrix_1.get(0));
-					current_pitch = glm::acos(camera_matrix_1.get(5));
-				}
 				else
-				{
-					camera_flag.set_on(false);
-					camera_matrix_1.stop_tweaking(true);
-					camera_matrix_2.stop_tweaking(true);
-				}
-
-				sentinel.increment();
-			}
-		}
-
-		// end of cinematics, etc. can reset this flag, so we keep writing it
-		if (pause_toggle.currently_tweaking())
 		{
-			pause_toggle.set(0, 0x01);
-			pause_toggle.flush(ps2);
+			// Старый фрикам полностью вырезан
 		}
 
 		if (camera_flag.is_on())
