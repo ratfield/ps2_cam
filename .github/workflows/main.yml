@@ -20,12 +20,14 @@ jobs:
 
     - name: Build Solution
       run: |
-        msbuild ./ps2_cam_acolyte.sln /p:Configuration=Release /p:Platform=x64
+        $sln = (Get-ChildItem -Recurse -Filter "*.sln" | Select-Object -First 1).FullName
+        if (-not $sln) { throw "Файл .sln не найден ни в одной папке!" }
+        msbuild $sln /p:Configuration=Release /p:Platform=x64
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: ps2_cam_acolyte_custom
         path: |
-          ./x64/Release/
-          ./Release/
+          **/x64/Release/
+          **/Release/
