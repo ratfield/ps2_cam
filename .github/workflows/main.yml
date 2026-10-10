@@ -1,0 +1,29 @@
+name: Build Custom Cam Acolyte
+
+on:
+  push:
+    branches: [ "main" ] # Сборка начнется сама при сохранении
+  workflow_dispatch: # Кнопка ручного запуска тоже останется
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Build App
+      run: |
+        msbuild ps2_cam_acolyte.sln /p:Configuration=Release /p:Platform=x64
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ps2_cam_acolyte_custom
+        path: x64/Release/
