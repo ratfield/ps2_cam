@@ -2,8 +2,8 @@ name: Build Custom Cam Acolyte
 
 on:
   push:
-    branches: [ "main" ] # Сборка начнется сама при сохранении
-  workflow_dispatch: # Кнопка ручного запуска тоже останется
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -15,15 +15,17 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v2
+    - name: Install MinGW
+      uses: egor-tisin/setup-mingw-gh-action@v1
+      with:
+        version: 12.2.0
 
-    - name: Build App
+    - name: Compile Custom App
       run: |
-        msbuild ps2_cam_acolyte.sln /p:Configuration=Release /p:Platform=x64
+        g++ -O3 src/main.cpp src/games/sh_origins.cpp -o ps2_cam_acolyte_custom.exe -static -lws2_32
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: ps2_cam_acolyte_custom
-        path: x64/Release/
+        path: ps2_cam_acolyte_custom.exe
