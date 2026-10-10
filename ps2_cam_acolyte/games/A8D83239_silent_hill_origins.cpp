@@ -10,6 +10,7 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <Windows.h>
 
 class silent_hill_origins : public ps2_game
 {
