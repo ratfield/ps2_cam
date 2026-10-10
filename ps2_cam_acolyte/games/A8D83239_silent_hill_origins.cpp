@@ -10,7 +10,7 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
-#include <Windows.h> // Критично для GetAsyncKeyState и VK-кодов клавиш
+#include <Windows.h> // Для GetAsyncKeyState
 
 class silent_hill_origins : public ps2_game
 {
@@ -23,6 +23,11 @@ private:
 	read_only_value_set<float, 3> player_pos;
 	read_only_value_set<float, 3> player_forward;
 	
+	// Адрес структуры ввода геймпада в памяти Silent Hill Origins (USA)
+	// Мы пишем маску кнопок напрямую в эмулируемую память PS2
+	tweakable_value_set<uint32_t, 1> ps2_buttons;
+	tweakable_value_set<uint8_t, 4> ps2_axes;
+
 	float current_yaw = 0.0f;
 	float current_pitch = 0.0f;
 	bool modern_controls = false;
@@ -41,6 +46,9 @@ public:
 		, in_gameplay(ps2, 0x003386b8)
 		, player_pos(ps2, 0x3449c8)
 		, player_forward(ps2, 0x3449d4)
+		// Мапим адреса ввода кнопок и осей геймпада 1 в памяти игры
+		, ps2_buttons(ps2, 0x00338510) 
+		, ps2_axes(ps2, 0x00338514)
 	{
 		camera_flag.edit_off().write<int32_t>(0x001133DC, 0x0C0899E8).finalize();
 		camera_flag.edit_on().write<int32_t>(0x001133DC, 0x00000000).finalize();
@@ -60,6 +68,8 @@ public:
 		camera_flag.reset();
 		camera_matrix_1.reset();
 		camera_matrix_2.reset();
+		ps2_buttons.reset();
+		ps2_axes.reset();
 	}
 
 	void update(const pcsx2& ps2, const controller_state& c, playback& camera_playback, float time_delta) override
@@ -114,11 +124,13 @@ public:
 			}
 
 			// =========================================================================
-			// НАТИВНЫЙ ИНЪЕКТОР КЛАВИАТУРЫ И МЫШИ ЧЕРЕЗ ЭМУЛЯТОР PCSX2 (ПРОТОКОЛ PINE)
+			// ПРЯМАЯ ЭМУЛЯЦИЯ КЛАВИАТУРЫ И МЫШИ ЧЕРЕЗ ЗАПИСЬ В ОЗУ ЭМУЛЯТОРА
 			// =========================================================================
-			auto& virtual_pad = const_cast<pcsx2&>(ps2).get_game_controller();
-
-			// 1. Ходьба (W, A, S, D -> Левый стик)
+			
+			// 1. Ходьба (W, A, S, D -> Перевод в значения осей PS2: 0..128..255)
+			uint8_t lx = 128; // Нейтральное положение стика
+			uint8_t ly = 128;
+			
 			float move_x = 0.0f;
 			float move_y = 0.0f;
 			if (GetAsyncKeyState('W') & 0x8000) move_y += 1.0f;
@@ -126,34 +138,37 @@ public:
 			if (GetAsyncKeyState('D') & 0x8000) move_x += 1.0f;
 			if (GetAsyncKeyState('A') & 0x8000) move_x -= 1.0f;
 
-			// Нормализуем вектор, чтобы по диагонали Трэвис не бегал быстрее
 			if (move_x != 0.0f || move_y != 0.0f) {
 				glm::vec2 norm_move = glm::normalize(glm::vec2(move_x, move_y)) * 127.0f;
-				virtual_pad.set_axis(0, (int)norm_move.x);       // LX (Влево/Вправо)
-				virtual_pad.set_axis(1, (int)(-norm_move.y));    // LY (Вверх/Вниз, инверсия для PS2)
-			} else {
-				virtual_pad.set_axis(0, 0);
-				virtual_pad.set_axis(1, 0);
+				lx = (uint8_t)(128 + (int)norm_move.x);
+				ly = (uint8_t)(128 - (int)norm_move.y); // Инверсия оси Y для PS2
 			}
 
-			// 2. Действия и Кнопки
-			bool wants_aim  = (GetAsyncKeyState(VK_RBUTTON) & 0x8000); // ПКМ - Прицеливание (R1)
-			bool wants_hit  = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) || (GetAsyncKeyState('E') & 0x8000); // ЛКМ или E - Атака / Обыск (Cross)
-			bool wants_run  = (GetAsyncKeyState(VK_MENU) & 0x8000);    // Левый ALT - Бег (Square)
-			bool wants_map  = (GetAsyncKeyState(VK_TAB) & 0x8000);     // TAB - Карта (Triangle)
-			bool wants_inv  = (GetAsyncKeyState('C') & 0x8000);        // C - Инвентарь (Start)
-			bool wants_lamp = (GetAsyncKeyState('F') & 0x8000);        // F - Фонарь (Select)
+			// Пишем оси напрямую в память контроллера PS2
+			ps2_axes.start_tweaking();
+			ps2_axes.set(0, lx); // Left Stick X
+			ps2_axes.set(1, ly); // Left Stick Y
+			ps2_axes.flush(ps2);
 
-			// Отправляем кнопки в эмулятор (картируем под пресет Origins)
-			virtual_pad.set_button(controller_bindings::r1, wants_aim);    // Боевая стойка
-			virtual_pad.set_button(controller_bindings::cross, wants_hit);  // Удар / Действие
-			virtual_pad.set_button(controller_bindings::square, wants_run); // Бег
-			virtual_pad.set_button(controller_bindings::triangle, wants_map); // Карта
-			virtual_pad.set_button(controller_bindings::start, wants_inv);  // Инвентарь
-			virtual_pad.set_button(controller_bindings::back, wants_lamp);  // Фонарь
+			// 2. Обработка кнопок (Битовая маска DualShock 2)
+			// В PS2 биты инвертированы (0 - нажато, 1 - отпущено). Начальное состояние 0xFFFF
+			uint32_t buttons_mask = 0xFFFF; 
+
+			if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) buttons_mask &= ~(1 << 11); // ПКМ -> R1 (Прицеливание)
+			if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) || (GetAsyncKeyState('E') & 0x8000)) {
+				buttons_mask &= ~(1 << 14); // ЛКМ / E -> Cross (Удар / Обыск)
+			}
+			if (GetAsyncKeyState(VK_MENU) & 0x8000)     buttons_mask &= ~(1 << 15); // Левый ALT -> Square (Бег)
+			if (GetAsyncKeyState(VK_TAB) & 0x8000)      buttons_mask &= ~(1 << 12); // TAB -> Triangle (Карта)
+			if (GetAsyncKeyState('C') & 0x8000)         buttons_mask &= ~(1 << 3);  // C -> Start (Инвентарь)
+			if (GetAsyncKeyState('F') & 0x8000)         buttons_mask &= ~(1 << 0);  // F -> Select (Фонарь)
+
+			ps2_buttons.start_tweaking();
+			ps2_buttons.set(0, buttons_mask);
+			ps2_buttons.flush(ps2);
 		}
 
-		// Логика обработки и вывода координат камеры (Мышь -> Правый стик)
+		// Логика обработки и вывода координат TPS-камеры (Считывание смещения мыши)
 		if (camera_flag.is_on())
 		{
 			float final_yaw = 0.0f;
@@ -167,13 +182,13 @@ public:
 				player_pos.update();
 				player_forward.update();
 
-				// Считываем смещение мыши напрямую через SDL утилиты
+				// Считываем смещение мыши через встроенный SDL утилиты
 				int mouse_dx = 0, mouse_dy = 0;
 				SDL_GetRelativeMouseState(&mouse_dx, &mouse_dy);
 
-				// Применяем движение мыши к углам обзора (turn_scale регулирует чувствительность)
+				// Применяем дельту мыши к углам обзора с учетом turn_scale
 				current_yaw += (float)mouse_dx * turn_scale * 0.1f;
-				current_pitch += (float)mouse_dy * turn_scale * 0.1f; // НАШ САМОЛЕТНЫЙ ПЛЮС НА МЕСТЕ
+				current_pitch += (float)mouse_dy * turn_scale * 0.1f; // НАШ САМОЛЕТНЫЙ ПЛЮС ТУТ
 
 				current_pitch = glm::clamp(current_pitch, glm::radians(-70.0f), glm::radians(30.0f));
 
@@ -199,7 +214,7 @@ public:
 			camera_playback.update(time_delta, final_yaw, final_pitch, pos.x, pos.y, pos.z);
 
 			glm::mat4 position_mat(1.0f);
-			position_mat[3] = glm::vec4(pos.x, pos.y, pos.z, 1.0f);
+			position_mat = glm::vec4(pos.x, pos.y, pos.z, 1.0f);
 
 			glm::mat4 final_mat = position_mat * shared_camera::compute_rotation_matrix_y_x(final_yaw, final_pitch);
 
