@@ -116,7 +116,7 @@ public:
 			// НАДЁЖНАЯ СИСТЕМА ИНЪЕКЦИИ ВВОДА ЧЕРЕЗ СИСТЕМНЫЕ КЛИЕНТЫ ПЛАТФОРМЫ ПЛАТИНЫ
 			// =========================================================================
 			
-			// Считываем WASD клавиатуры на ПК
+						// 1. Ходьба (W, A, S, D -> Левый стик)
 			float move_x = 0.0f;
 			float move_y = 0.0f;
 			if (GetAsyncKeyState('W') & 0x8000) move_y += 1.0f;
@@ -124,25 +124,24 @@ public:
 			if (GetAsyncKeyState('D') & 0x8000) move_x += 1.0f;
 			if (GetAsyncKeyState('A') & 0x8000) move_x -= 1.0f;
 
-			// Модифицируем входные данные самого системного контроллера плагина,
-			// чтобы утилита на базовом уровне скормила эмулятору нужные оси
 			controller_state& emu_pad = const_cast<controller_state&>(c);
 
 			if (move_x != 0.0f || move_y != 0.0f) {
 				glm::vec2 norm_move = glm::normalize(glm::vec2(move_x, move_y));
-				emu_pad.set_left_axis(norm_move.x, norm_move.y);
+				// Передаем как единый вектор (структуру), как требует автор
+				emu_pad.set_left_axis({norm_move.x, norm_move.y});
 			} else {
-				emu_pad.set_left_axis(0.0f, 0.0f);
+				emu_pad.set_left_axis({0.0f, 0.0f});
 			}
 
-			// Картируем состояние кнопок мыши и клавиш под системные триггеры автора
+			// 2. Кнопки (Привязка к точным внутренним именам автора)
 			emu_pad.set_button_state(controller_bindings::r1, (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0); // ПКМ
 			emu_pad.set_button_state(controller_bindings::cross, ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || ((GetAsyncKeyState('E') & 0x8000) != 0)); // ЛКМ / E
 			emu_pad.set_button_state(controller_bindings::square, (GetAsyncKeyState(VK_MENU) & 0x8000) != 0); // Л.ALT
 			emu_pad.set_button_state(controller_bindings::triangle, (GetAsyncKeyState(VK_TAB) & 0x8000) != 0); // TAB
-			emu_pad.set_button_state(controller_bindings::back, (GetAsyncKeyState('C') & 0x8000) != 0); // C
-			emu_pad.set_button_state(controller_bindings::start, (GetAsyncKeyState('P') & 0x8000) != 0); // P
-			emu_pad.set_button_state(controller_bindings::circle, (GetAsyncKeyState('F') & 0x8000) != 0); // F
+			emu_pad.set_button_state(controller_bindings::select, (GetAsyncKeyState('C') & 0x8000) != 0); // C -> Select
+			emu_pad.set_button_state(controller_bindings::start_button, (GetAsyncKeyState('P') & 0x8000) != 0); // P -> Start
+			emu_pad.set_button_state(controller_bindings::circle, (GetAsyncKeyState('F') & 0x8000) != 0); // F -> Circle
 		}
 
 		if (camera_flag.is_on())
