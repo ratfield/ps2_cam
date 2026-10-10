@@ -205,7 +205,7 @@ public:
 
 		// НАШ ОБНОВЛЕННЫЙ ХОТКЕЙ: Переключение TPS-мода по кнопке F3 на клавиатуре
 		static bool f3_pressed = false;
-		if (SDL_GetKeyboardState(NULL)[SDL_SCANCODE_F3])
+		if (GetAsyncKeyState(VK_F3) & 0x8000)
 		{
 			if (!f3_pressed)
 			{
