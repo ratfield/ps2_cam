@@ -161,6 +161,7 @@ public:
 			if (GetAsyncKeyState(VK_MENU) & 0x8000)     buttons_mask &= ~(1 << 15); // Левый ALT -> Square (Бег)
 			if (GetAsyncKeyState(VK_TAB) & 0x8000)      buttons_mask &= ~(1 << 12); // TAB -> Triangle (Карта)
 			if (GetAsyncKeyState('C') & 0x8000)         buttons_mask &= ~(1 << 3);  // C -> Start (Инвентарь)
+			if (GetAsyncKeyState('P') & 0x8000)         buttons_mask &= ~(1 << 3);  // P -> Start (Пауза)
 			if (GetAsyncKeyState('F') & 0x8000)         buttons_mask &= ~(1 << 0);  // F -> Select (Фонарь)
 
 			ps2_buttons.start_tweaking();
