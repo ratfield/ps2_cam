@@ -15,14 +15,17 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Configure CMake
-      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
 
-    - name: Build Project
-      run: cmake --build build --config Release
+    - name: Build Solution
+      run: |
+        msbuild ./ps2_cam_acolyte.sln /p:Configuration=Release /p:Platform=x64
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: ps2_cam_acolyte_custom
-        path: build/Release/
+        path: |
+          ./x64/Release/
+          ./Release/
