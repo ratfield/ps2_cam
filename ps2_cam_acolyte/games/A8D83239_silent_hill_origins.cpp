@@ -214,7 +214,7 @@ public:
 			camera_playback.update(time_delta, final_yaw, final_pitch, pos.x, pos.y, pos.z);
 
 			glm::mat4 position_mat(1.0f);
-			position_mat = glm::vec4(pos.x, pos.y, pos.z, 1.0f);
+			position_mat[3] = glm::vec4(pos.x, pos.y, pos.z, 1.0f);
 
 			glm::mat4 final_mat = position_mat * shared_camera::compute_rotation_matrix_y_x(final_yaw, final_pitch);
 
