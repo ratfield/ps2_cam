@@ -7,6 +7,7 @@
 #include "preferences.h"
 #include <SDL_events.h>
 #include <chrono>
+#include <Windows.h> // Добавили для проверки статуса нашего мода
 
 extern void draw_ui();
 
@@ -37,8 +38,15 @@ int main()
     {
         auto frame_start_time = clock.now();
 
-        camera_controller.new_frame();
-        game_controller.new_frame();
+        // ОБХОД БЛОКИРОВКИ: Считываем из настроек, включен ли Modern Controls Mode.
+        // Если он активен, мы полностью запрещаем утилите стирать данные виртуального ввода!
+        bool kb_emulation_active = prefs.read_bool("A8D83239_modern_controls", false);
+
+        if (!kb_emulation_active)
+        {
+            camera_controller.new_frame();
+            game_controller.new_frame();
+        }
 
         bool render_now = false;
         SDL_Event event;
@@ -59,10 +67,14 @@ int main()
                 render_now = true;
             }
 
-            camera_controller.handle_event(event);
-			game_controller.handle_event(event);
+            // Если эмуляция клавиатуры активна, не даем SDL перехватывать пустые сигналы геймпадов
+            if (!kb_emulation_active)
+            {
+                camera_controller.handle_event(event);
+                game_controller.handle_event(event);
+            }
             ui_host.handle_event(event);
-            pending_render_frames = 2; // some events take a frame to play out, so request 2 renders
+            pending_render_frames = 2; 
         }
 
         if (ps2.update())
@@ -70,7 +82,6 @@ int main()
             pending_render_frames = 2;
         }
 
-        // ensure we never render faster than 60hz to keep the app low profile
         using namespace std::chrono_literals;
         if (pending_render_frames > 0 && (render_now || (clock.now() - last_rendered_frame_clock) > 16ms))
         {
@@ -82,7 +93,6 @@ int main()
             --pending_render_frames;
         }
 
-        // if we're going faster than 100hz, slow down to keep app low profile
         auto total_frame_time = clock.now() - frame_start_time;
         if (total_frame_time < 10ms)
         {
