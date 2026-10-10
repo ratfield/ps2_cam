@@ -8,6 +8,8 @@
 #include "glm/geometric.hpp"
 #include "glm/matrix.hpp"
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 class siren : public ps2_game
 {
