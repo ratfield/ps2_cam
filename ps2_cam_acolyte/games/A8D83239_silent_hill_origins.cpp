@@ -112,27 +112,6 @@ public:
 			camera_matrix_2.stop_tweaking(false);
 			sentinel.increment();
 		}
-
-		// =========================================================================
-		// ВОЗВРАТ ИСПРАВЛЕННОГО УПРАВЛЕНИЯ ПЕРСОНАЖЕМ (WASD)
-		// =========================================================================
-		float move_x = 0.0f;
-		float move_y = 0.0f;
-		if (GetAsyncKeyState('W') & 0x8000) move_y += 1.0f;
-		if (GetAsyncKeyState('S') & 0x8000) move_y -= 1.0f;
-		if (GetAsyncKeyState('D') & 0x8000) move_x += 1.0f;
-		if (GetAsyncKeyState('A') & 0x8000) move_x -= 1.0f;
-
-		// Обходим const через const_cast безопасно для мутации осей
-		controller_state& emu_pad = const_cast<controller_state&>(c);
-
-		if (move_x != 0.0f || move_y != 0.0f) {
-			glm::vec2 norm_move = glm::normalize(glm::vec2(move_x, move_y));
-			// Передаем двумя аргументами (float, float), чтобы избежать ошибки C2660
-			emu_pad.set_left_axis(norm_move.x, norm_move.y); 
-		} else {
-			emu_pad.set_left_axis(0.0f, 0.0f);
-		}
 	}
 
 	// Работа с TPS-камерой
@@ -148,13 +127,10 @@ public:
 			player_pos.update();
 			player_forward.update();
 
-			// =========================================================================
-			// НАДЕЖНЫЙ ХАК И ТРЕКИНГ МЫШИ ЧЕРЕЗ WINDOWS API (РАБОТАЕТ В ПОЛНОЭКРАННОМ)
-			// =========================================================================
+			// Трекинг мыши через Windows API (работает и в окне, и в фуллскрине)
 			int mouse_dx = 0;
 			int mouse_dy = 0;
 
-			// Получаем разрешение экрана, чтобы найти центр
 			int screen_width = GetSystemMetrics(SM_CXSCREEN);
 			int screen_height = GetSystemMetrics(SM_CYSCREEN);
 			int center_x = screen_width / 2;
@@ -165,12 +141,9 @@ public:
 			{
 				mouse_dx = current_pos.x - center_x;
 				mouse_dy = current_pos.y - center_y;
-				
-				// Запираем курсор в центре экрана, чтобы он никогда не упирался в края
 				SetCursorPos(center_x, center_y);
 			}
 
-			// Вычисление углов вращения (ось Y исправлена)
 			current_yaw += (float)mouse_dx * turn_scale * 0.1f;
 			current_pitch -= (float)mouse_dy * turn_scale * 0.1f; 
 
@@ -197,8 +170,9 @@ public:
 
 		camera_playback.update(time_delta, final_yaw, final_pitch, pos.x, pos.y, pos.z);
 
+		// ИСПРАВЛЕНИЕ ОШИБКИ C2679: Правильно выставляем позицию в матрицу 4x4
 		glm::mat4 final_mat = shared_camera::compute_rotation_matrix_y_x(final_yaw, final_pitch);
-		final_mat = glm::vec4(pos.x, pos.y, pos.z, 1.0f); 
+		final_mat[3] = glm::vec4(pos.x, pos.y, pos.z, 1.0f); 
 
 		camera_matrix_1.set(0, final_mat);
 		camera_matrix_2.set(0, final_mat);
