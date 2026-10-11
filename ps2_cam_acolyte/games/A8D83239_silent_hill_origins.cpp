@@ -112,9 +112,30 @@ public:
 			camera_matrix_2.stop_tweaking(false);
 			sentinel.increment();
 		}
+
+		// =========================================================================
+		// ВОЗВРАТ ИСПРАВЛЕННОГО УПРАВЛЕНИЯ ПЕРСОНАЖЕМ (WASD)
+		// =========================================================================
+		float move_x = 0.0f;
+		float move_y = 0.0f;
+		if (GetAsyncKeyState('W') & 0x8000) move_y += 1.0f;
+		if (GetAsyncKeyState('S') & 0x8000) move_y -= 1.0f;
+		if (GetAsyncKeyState('D') & 0x8000) move_x += 1.0f;
+		if (GetAsyncKeyState('A') & 0x8000) move_x -= 1.0f;
+
+		// Обходим const через const_cast безопасно для мутации осей
+		controller_state& emu_pad = const_cast<controller_state&>(c);
+
+		if (move_x != 0.0f || move_y != 0.0f) {
+			glm::vec2 norm_move = glm::normalize(glm::vec2(move_x, move_y));
+			// Передаем двумя аргументами (float, float), чтобы избежать ошибки C2660
+			emu_pad.set_left_axis(norm_move.x, norm_move.y); 
+		} else {
+			emu_pad.set_left_axis(0.0f, 0.0f);
+		}
 	}
 
-	// Работа с TPS-камерой (активна, когда взведен флаг)
+	// Работа с TPS-камерой
 	if (camera_flag.is_on())
 	{
 		float final_yaw = 0.0f;
@@ -127,18 +148,34 @@ public:
 			player_pos.update();
 			player_forward.update();
 
-			// Считывание движения мыши через SDL2
-			int mouse_dx = 0, mouse_dy = 0;
-			SDL_GetRelativeMouseState(&mouse_dx, &mouse_dy);
+			// =========================================================================
+			// НАДЕЖНЫЙ ХАК И ТРЕКИНГ МЫШИ ЧЕРЕЗ WINDOWS API (РАБОТАЕТ В ПОЛНОЭКРАННОМ)
+			// =========================================================================
+			int mouse_dx = 0;
+			int mouse_dy = 0;
 
-			// Инверсия оси Y (теперь мышь вниз = взгляд камеры опускается вниз)
+			// Получаем разрешение экрана, чтобы найти центр
+			int screen_width = GetSystemMetrics(SM_CXSCREEN);
+			int screen_height = GetSystemMetrics(SM_CYSCREEN);
+			int center_x = screen_width / 2;
+			int center_y = screen_height / 2;
+
+			POINT current_pos;
+			if (GetCursorPos(&current_pos))
+			{
+				mouse_dx = current_pos.x - center_x;
+				mouse_dy = current_pos.y - center_y;
+				
+				// Запираем курсор в центре экрана, чтобы он никогда не упирался в края
+				SetCursorPos(center_x, center_y);
+			}
+
+			// Вычисление углов вращения (ось Y исправлена)
 			current_yaw += (float)mouse_dx * turn_scale * 0.1f;
 			current_pitch -= (float)mouse_dy * turn_scale * 0.1f; 
 
-			// Ограничение углов, чтобы камера не переворачивалась
 			current_pitch = glm::clamp(current_pitch, glm::radians(-70.0f), glm::radians(30.0f));
 
-			// Расчет направления взгляда
 			glm::vec3 cam_forward = glm::vec3(
 				glm::cos(current_yaw) * glm::cos(current_pitch),
 				glm::sin(current_pitch),
@@ -146,11 +183,7 @@ public:
 			);
 
 			glm::vec3 cam_right = glm::cross(cam_forward, glm::vec3(0.0f, 1.0f, 0.0f));
-			
-			// Вычисление позиции камеры позади персонажа (TPS-вид)
-			pos = glm::vec3(player_pos.get(0), player_pos.get(1) + modern_controls_y_offset, player_pos.get(2)) 
-			      - cam_forward * modern_controls_distance_offset 
-			      + cam_right * modern_controls_x_offset;
+			pos = glm::vec3(player_pos.get(0), player_pos.get(1) + modern_controls_y_offset, player_pos.get(2)) - cam_forward * modern_controls_distance_offset + cam_right * modern_controls_x_offset;
 
 			final_yaw = glm::radians(90.0f) - atan2(cam_forward.z, cam_forward.x);
 			final_pitch = -asin(cam_forward.y);
@@ -164,9 +197,8 @@ public:
 
 		camera_playback.update(time_delta, final_yaw, final_pitch, pos.x, pos.y, pos.z);
 
-		// Формирование и безопасная запись матрицы камеры эмулятора
 		glm::mat4 final_mat = shared_camera::compute_rotation_matrix_y_x(final_yaw, final_pitch);
-		final_mat[3] = glm::vec4(pos.x, pos.y, pos.z, 1.0f); 
+		final_mat = glm::vec4(pos.x, pos.y, pos.z, 1.0f); 
 
 		camera_matrix_1.set(0, final_mat);
 		camera_matrix_2.set(0, final_mat);
