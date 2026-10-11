@@ -1,8 +1,6 @@
 name: Build Custom Cam Acolyte
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
