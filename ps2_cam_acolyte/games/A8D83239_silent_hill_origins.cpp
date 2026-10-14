@@ -153,11 +153,13 @@ public:
 	{
 		if (sentinel.has_reset()) { reset_all(); }
 
+		// === УПРАВЛЕНИЕ КЛАВИШЕЙ F2 (Brightness Boost) ===
 		static bool f2_pressed = false;
 		if (GetAsyncKeyState(VK_F2) & 0x8000) {
 			if (!f2_pressed) { brightness_flag.toggle(); sentinel.increment(); f2_pressed = true; }
 		} else { f2_pressed = false; }
 
+		// === УПРАВЛЕНИЕ КЛАВИШЕЙ F3 (Modern Controls) ===
 		static bool f3_pressed = false;
 		if (GetAsyncKeyState(VK_F3) & 0x8000) {
 			if (!f3_pressed) { modern_controls = !modern_controls; ps2.get_prefs().write_bool("A8D83239_modern_controls", modern_controls); reset_all(); sentinel.increment(); f3_pressed = true; }
@@ -176,10 +178,54 @@ public:
 				player_forward.update(); glm::vec3 forward = glm::vec3(player_forward.get(0), player_forward.get(1), player_forward.get(2));
 				current_yaw = atan2(forward.z, forward.x); current_pitch = 0.0f; sentinel.increment();
 			}
+			// ПРЕДОХРАНИТЕЛЬ: Защита от спама в память во время загрузок локаций и инвентаря
 			else if (!camera_should_be_on && camera_flag.is_on())
 			{
 				camera_flag.set_on(false); camera_matrix_1.stop_tweaking(false); camera_matrix_2.stop_tweaking(false);
 				sentinel.increment(); std::this_thread::sleep_for(std::chrono::milliseconds(10));
+			}
+
+			if (camera_should_be_on && !modern_controls_flags.currently_tweaking())
+			{
+				modern_controls_flags.start_tweaking(); modern_controls_flags.set(modern_controls_flags_on, 1);
+				modern_controls_flags.flush(ps2); modern_controls_instructions.set_on(true); sentinel.increment();
+			}
+			else if (!camera_should_be_on && modern_controls_flags.currently_tweaking())
+			{
+				modern_controls_flags.set(modern_controls_flags_on, 0); modern_controls_flags.flush(ps2);
+				modern_controls_flags.stop_tweaking(false); sentinel.increment();
+			}
+
+			if (modern_controls_flags.currently_tweaking())
+			{
+				const controller_state& game_controller_state = ps2.get_game_controller().get_state();
+				bool wantsToAttack = game_controller_state.get_right_trigger() > 0.5f;
+				bool wantsToRun = (game_controller_state.get_left_trigger() > 0.5f && !wantsToAttack) || game_controller_state.button(controller_bindings::square);
+				modern_controls_flags.set(modern_controls_flags_block_offset, wantsToRun ? 1 : 0);
+				modern_controls_flags.set(modern_controls_flags_run_offset, wantsToRun ? 1 : 0);
+
+				if (game_controller_state.button(controller_bindings::r1))
+				{
+					time_until_stop_attack_allowed = 0.0f; time_until_attack_allowed = 0.0f;
+					modern_controls_flags.set(modern_controls_flags_stance_offset, 1);
+					modern_controls_flags.set(modern_controls_flags_attack_offset, game_controller_state.button(controller_bindings::cross) ? 1 : 0);
+				}
+				else
+				{
+					if (wantsToAttack)
+					{
+						modern_controls_flags.set(modern_controls_flags_stance_offset, 1); time_until_stop_attack_allowed = 0.1f;
+						if (time_until_attack_allowed > 0.0f) { time_until_attack_allowed -= time_delta; }
+						modern_controls_flags.set(modern_controls_flags_attack_offset, time_until_attack_allowed < 0.0f ? 1 : 0);
+					}
+					else
+					{
+						time_until_attack_allowed = 0.1f; modern_controls_flags.set(modern_controls_flags_stance_offset, 0);
+						if (time_until_stop_attack_allowed > 0.0f) { time_until_stop_attack_allowed -= time_delta; }
+						modern_controls_flags.set(modern_controls_flags_attack_offset, game_controller_state.button(controller_bindings::cross) || time_until_stop_attack_allowed > 0.0f ? 1 : 0);
+					}
+				}
+				modern_controls_flags.flush(ps2);
 			}
 		}
 
@@ -189,8 +235,7 @@ public:
 			if (modern_controls)
 			{
 				player_pos.update(); player_forward.update();
-				int mouse_dx = 0; int mouse_dy = 0;
-				POINT current_pos;
+				int mouse_dx = 0; int mouse_dy = 0; POINT current_pos;
 				if (GetCursorPos(&current_pos)) {
 					mouse_dx = current_pos.x - (GetSystemMetrics(SM_CXSCREEN) / 2);
 					mouse_dy = current_pos.y - (GetSystemMetrics(SM_CYSCREEN) / 2);
