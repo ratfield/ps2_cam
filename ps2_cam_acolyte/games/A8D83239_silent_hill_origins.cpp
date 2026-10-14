@@ -254,8 +254,12 @@ public:
 				pos = glm::vec3(camera_matrix_1.get(12), camera_matrix_1.get(13), camera_matrix_1.get(14));
 			}
 			camera_playback.update(time_delta, final_yaw, final_pitch, pos.x, pos.y, pos.z);
-			glm::mat4 final_mat = shared_camera::compute_rotation_matrix_y_x(final_yaw, final_pitch);
-			final_mat = glm::vec4(pos.x, pos.y, pos.z, 1.0f);
+			
+			// ФИКС МАТРИЦЫ: Корректно перемножаем позицию на вращение, как в оригинале
+			glm::mat4 position_mat(1.0f);
+			position_mat[3] = glm::vec4(pos.x, pos.y, pos.z, 1.0f);
+			glm::mat4 final_mat = position_mat * shared_camera::compute_rotation_matrix_y_x(final_yaw, final_pitch);
+
 			camera_matrix_1.set(0, final_mat); camera_matrix_2.set(0, final_mat);
 			camera_matrix_1.flush(ps2); camera_matrix_2.flush(ps2);
 		}
