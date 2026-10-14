@@ -70,7 +70,23 @@ public:
 		reset_all();
 	}
 
-	// Глобальный переключатель хака (F3)
+	// === УПРАВЛЕНИЕ КЛАВИШЕЙ F2 (Brightness Boost) ===
+	static bool f2_pressed = false;
+	if (GetAsyncKeyState(VK_F2) & 0x8000)
+	{
+		if (!f2_pressed)
+		{
+			brightness_flag.toggle();
+			sentinel.increment();
+			f2_pressed = true;
+		}
+	}
+	else
+	{
+		f2_pressed = false;
+	}
+
+	// === УПРАВЛЕНИЕ КЛАВИШЕЙ F3 (Modern Controls) ===
 	static bool f3_pressed = false;
 	if (GetAsyncKeyState(VK_F3) & 0x8000)
 	{
@@ -115,8 +131,7 @@ public:
 			current_pitch = 0.0f;
 			sentinel.increment();
 		}
-		// ПРЕДОХРАНИТЕЛЬ: Если камера должна выключиться (зашли в инвентарь/дверь),
-		// но мы только что делали изменения — даем паузу, чтобы не спамить в память во время загрузки
+		// ПРЕДОХРАНИТЕЛЬ: Защита от спама в память во время загрузок локаций и инвентаря
 		else if (!camera_should_be_on && camera_flag.is_on())
 		{
 			camera_flag.set_on(false);
