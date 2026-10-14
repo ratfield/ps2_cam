@@ -160,7 +160,7 @@ public:
 
 		static bool f3_pressed = false;
 		if (GetAsyncKeyState(VK_F3) & 0x8000) {
-			if (!f3_pressed) { modern_controls = !modern_controls; prefs.write_bool("A8D83239_modern_controls", modern_controls); reset_all(); sentinel.increment(); f3_pressed = true; }
+			if (!f3_pressed) { modern_controls = !modern_controls; ps2.get_prefs().write_bool("A8D83239_modern_controls", modern_controls); reset_all(); sentinel.increment(); f3_pressed = true; }
 		} else { f3_pressed = false; }
 
 		if (modern_controls)
@@ -210,7 +210,7 @@ public:
 			}
 			camera_playback.update(time_delta, final_yaw, final_pitch, pos.x, pos.y, pos.z);
 			glm::mat4 final_mat = shared_camera::compute_rotation_matrix_y_x(final_yaw, final_pitch);
-			final_mat[3] = glm::vec4(pos.x, pos.y, pos.z, 1.0f);
+			final_mat = glm::vec4(pos.x, pos.y, pos.z, 1.0f);
 			camera_matrix_1.set(0, final_mat); camera_matrix_2.set(0, final_mat);
 			camera_matrix_1.flush(ps2); camera_matrix_2.flush(ps2);
 		}
